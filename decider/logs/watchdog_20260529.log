@@ -1,0 +1,91 @@
+[2026-05-29 17:10:01] Watchdog started
+[2026-05-29 17:10:01] Active deciders: 6
+[2026-05-29 17:10:02] ZMQ: OK: 6 robots visible
+[2026-05-29 17:10:02] Log errors: 0
+0 in sim_decider_20260529_170752.log
+[2026-05-29 17:10:02] Watchdog complete
+---
+[2026-05-29 17:15:01] Watchdog started
+[2026-05-29 17:15:01] Active deciders: 6
+[2026-05-29 17:15:04] ZMQ: OK: 6 robots visible
+[2026-05-29 17:15:04] Log errors: 0
+0 in sim_decider_20260529_171333.log
+[2026-05-29 17:15:04] Latest debug:
+2026-05-29 17:14:55,415 [INFO] SimDecider: [DBG] red#2(GK) pos=(-2.05,-1.50) yaw=173.3° ball_dist=2.35 ball_seen=True
+2026-05-29 17:14:55,773 [INFO] SimDecider: [DBG] blue#1(DEF) pos=(-0.05,0.67) yaw=-48.0° ball_dist=1.12 ball_seen=True
+2026-05-29 17:14:56,138 [INFO] SimDecider: [DBG] red#1(DEF) pos=(-0.21,0.73) yaw=-75.7° ball_dist=0.54 ball_seen=True
+2026-05-29 17:14:56,498 [INFO] SimDecider: [DBG] red#0(FWD) pos=(-0.26,0.95) yaw=-86.1° ball_dist=0.72 ball_seen=True
+2026-05-29 17:14:56,858 [INFO] SimDecider: [DBG] blue#2(GK) pos=(-1.59,-1.53) yaw=148.8° ball_dist=2.45 ball_seen=True
+2026-05-29 17:14:57,213 [INFO] SimDecider: [DBG] blue#0(FWD) pos=(0.49,0.14) yaw=-48.9° ball_dist=0.44 ball_seen=True
+[2026-05-29 17:15:04] Watchdog complete
+---
+[2026-05-29 17:20:01] Watchdog started
+[2026-05-29 17:20:01] Active deciders: 6
+[2026-05-29 17:20:03] ZMQ: OK: 6 robots visible
+[2026-05-29 17:20:03] Log errors: 0
+0 in sim_decider_20260529_171545.log
+[2026-05-29 17:20:03] Latest debug:
+2026-05-29 17:19:58,803 [INFO] SimDecider: [DBG] red#0(FWD) pos=(-0.32,1.01) yaw=-111.6° ball_dist=0.75 ball_seen=True
+2026-05-29 17:19:59,160 [INFO] SimDecider: [DBG] blue#1(DEF) pos=(0.06,0.65) yaw=-67.8° ball_dist=1.38 ball_seen=True
+2026-05-29 17:19:59,517 [INFO] SimDecider: [DBG] red#1(DEF) pos=(-0.10,0.75) yaw=-122.3° ball_dist=0.80 ball_seen=True
+2026-05-29 17:19:59,874 [INFO] SimDecider: [DBG] blue#0(FWD) pos=(0.98,-0.12) yaw=-77.2° ball_dist=0.38 ball_seen=True
+2026-05-29 17:20:00,241 [INFO] SimDecider: [DBG] red#2(GK) pos=(-2.35,-1.36) yaw=158.3° ball_dist=2.37 ball_seen=True
+2026-05-29 17:20:00,602 [INFO] SimDecider: [DBG] blue#2(GK) pos=(-1.95,-1.41) yaw=167.4° ball_dist=2.95 ball_seen=True
+[2026-05-29 17:20:03] Watchdog complete
+---
+[2026-05-29 17:25:01] Watchdog started
+[2026-05-29 17:25:01] Active deciders: 6
+[2026-05-29 17:25:03] ZMQ: OK: 6 robots visible
+[2026-05-29 17:25:03] Log errors: 0
+0 in sim_decider_20260529_171545.log
+[2026-05-29 17:25:03] Latest debug:
+2026-05-29 17:25:01,149 [INFO] SimDecider: [DBG] red#0(FWD) pos=(-0.33,1.03) yaw=-130.2° ball_dist=0.85 ball_seen=True
+2026-05-29 17:25:01,505 [INFO] SimDecider: [DBG] blue#1(DEF) pos=(0.05,0.66) yaw=-114.6° ball_dist=1.69 ball_seen=True
+2026-05-29 17:25:01,864 [INFO] SimDecider: [DBG] red#1(DEF) pos=(-0.17,0.80) yaw=-129.6° ball_dist=0.94 ball_seen=True
+2026-05-29 17:25:02,222 [INFO] SimDecider: [DBG] blue#0(FWD) pos=(1.19,-0.55) yaw=-104.7° ball_dist=0.14 ball_seen=True
+2026-05-29 17:25:02,585 [INFO] SimDecider: [DBG] red#2(GK) pos=(-2.73,-1.31) yaw=144.4° ball_dist=2.55 ball_seen=True
+2026-05-29 17:25:02,935 [INFO] SimDecider: [DBG] blue#2(GK) pos=(-2.34,-1.31) yaw=-171.6° ball_dist=3.50 ball_seen=True
+[2026-05-29 17:25:03] Watchdog complete
+---
+[2026-05-29 17:30:01] Watchdog started
+[2026-05-29 17:30:01] Active deciders: 6
+[2026-05-29 17:30:03] ZMQ: OK: 6 robots visible
+[2026-05-29 17:30:03] Log errors: 0
+0 in sim_decider_20260529_171545.log
+[2026-05-29 17:30:03] Latest debug:
+2026-05-29 17:29:42,141 [INFO] SimDecider: [DBG] red#0(FWD) pos=(-0.36,0.98) yaw=-134.0° ball_dist=1.26 ball_seen=True
+2026-05-29 17:29:42,489 [INFO] SimDecider: [DBG] blue#1(DEF) pos=(0.09,0.63) yaw=-152.7° ball_dist=1.07 ball_seen=True
+2026-05-29 17:29:42,851 [INFO] SimDecider: [DBG] red#1(DEF) pos=(-0.23,0.63) yaw=-162.3° ball_dist=1.07 ball_seen=True
+2026-05-29 17:29:43,202 [INFO] SimDecider: [DBG] blue#0(FWD) pos=(1.07,-0.60) yaw=-146.6° ball_dist=0.70 ball_seen=True
+2026-05-29 17:29:43,550 [INFO] SimDecider: [DBG] red#2(GK) pos=(-3.09,-1.10) yaw=169.6° ball_dist=2.30 ball_seen=True
+2026-05-29 17:29:43,907 [INFO] SimDecider: [DBG] blue#2(GK) pos=(-2.58,-1.34) yaw=171.8° ball_dist=3.88 ball_seen=True
+[2026-05-29 17:30:03] Watchdog complete
+---
+[2026-05-29 17:35:01] Watchdog started
+[2026-05-29 17:35:01] Active deciders: 6
+[2026-05-29 17:35:04] ZMQ: OK: 6 robots visible
+[2026-05-29 17:35:04] Log errors: 0
+0 in sim_decider_20260529_173346.log
+[2026-05-29 17:35:04] Latest debug:
+2026-05-29 17:34:47,376 [INFO] SimDecider: [DBG] blue#2(GK) pos=(-2.80,-1.29) yaw=149.9° ball_dist=4.36 ball_seen=True
+2026-05-29 17:34:47,727 [INFO] SimDecider: [DBG] blue#0(FWD) pos=(0.84,-0.15) yaw=-178.8° ball_dist=1.16 ball_seen=True
+2026-05-29 17:34:48,075 [INFO] SimDecider: [DBG] red#2(GK) pos=(-3.33,-0.98) yaw=169.5° ball_dist=2.43 ball_seen=True
+2026-05-29 17:34:48,427 [INFO] SimDecider: [DBG] red#1(DEF) pos=(-0.26,0.49) yaw=-95.7° ball_dist=1.63 ball_seen=True
+2026-05-29 17:34:48,775 [INFO] SimDecider: [DBG] red#0(FWD) pos=(-0.58,0.66) yaw=-106.4° ball_dist=1.70 ball_seen=True
+2026-05-29 17:34:49,126 [INFO] SimDecider: [DBG] blue#1(DEF) pos=(0.09,0.59) yaw=164.0° ball_dist=0.92 ball_seen=True
+[2026-05-29 17:35:04] Watchdog complete
+---
+[2026-05-29 17:40:01] Watchdog started
+[2026-05-29 17:40:01] Active deciders: 6
+[2026-05-29 17:40:03] ZMQ: OK: 6 robots visible
+[2026-05-29 17:40:03] Log errors: 0
+0 in sim_decider_20260529_173926.log
+[2026-05-29 17:40:03] Latest debug:
+2026-05-29 17:39:44,563 [INFO] SimDecider: [DBG] red#2(GK) pos=(-3.61,-0.96) yaw=176.2° ball_dist=2.94 ball_seen=True
+2026-05-29 17:39:44,913 [INFO] SimDecider: [DBG] blue#0(FWD) pos=(0.75,-0.11) yaw=147.6° ball_dist=1.88 ball_seen=True
+2026-05-29 17:39:45,271 [INFO] SimDecider: [DBG] blue#2(GK) pos=(-2.98,-1.07) yaw=143.7° ball_dist=4.71 ball_seen=True
+2026-05-29 17:39:45,626 [INFO] SimDecider: [DBG] red#1(DEF) pos=(-0.22,0.33) yaw=-64.3° ball_dist=2.17 ball_seen=True
+2026-05-29 17:39:45,975 [INFO] SimDecider: [DBG] blue#1(DEF) pos=(0.07,0.51) yaw=127.6° ball_dist=1.44 ball_seen=True
+2026-05-29 17:39:46,332 [INFO] SimDecider: [DBG] red#0(FWD) pos=(-0.55,0.38) yaw=-95.6° ball_dist=2.16 ball_seen=True
+[2026-05-29 17:40:03] Watchdog complete
+---

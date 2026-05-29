@@ -35,12 +35,11 @@ ROLE_FORWARD = 0
 ROLE_DEFENDER = 1
 ROLE_GOALKEEPER = 2
 
-# Position targets for each role (X, Y, YAW in degrees)
-# These are for red team; blue team uses coordinate mirroring in vision.py
+# Position targets for each role (X, Y)
 ROLE_POSITIONS = {
-    ROLE_FORWARD:    (-1.0,  0.0,   0),    # Center forward
-    ROLE_DEFENDER:   (-2.5,  0.0,   0),    # Center back
-    ROLE_GOALKEEPER: (-3.8,  0.0,   0),    # Goal line center
+    ROLE_FORWARD:    (-1.0,  0.0),
+    ROLE_DEFENDER:   (-2.5,  0.0),
+    ROLE_GOALKEEPER: (-HALF_LENGTH + 0.3,  0.0),
 }
 
 
@@ -108,55 +107,34 @@ def loop(agent) -> None:
 def game(agent) -> None:
     """
     Main game loop with GameController integration.
-    State machine:
-      INITIAL -> READY -> SET -> PLAYING -> FINISHED
-
-    When no referee is active (GC never updated), falls through to
-    direct PLAYING mode so robots can still play.
+    When no referee is active, falls through to direct PLAYING mode.
     """
     gc = agent.gamecontroller
     state = gc.game_state
-    logger = agent.get_logger()
 
-    local_id = agent.get_config().get("id", 0)
-
-    # Check if GameController has ever been updated (referee active)
     gc_active = gc.game_state_int != 0 or gc.secs_remaining != 0 or gc.set_play != 0
 
     if gc_active:
-        # ==========================================
-        # STATE_INITIAL / STATE_READY: Go to position
-        # ==========================================
         if state in ("STATE_INITIAL", "STATE_READY"):
+            local_id = agent.get_config().get("id", 0)
             pos = ROLE_POSITIONS.get(local_id, ROLE_POSITIONS[ROLE_FORWARD])
             agent.state_machine_runners['go_back_to_field'](
-                aim_x=pos[0], aim_y=pos[1], aim_yaw=pos[2]
+                aim_x=pos[0], aim_y=pos[1], aim_yaw=0
             )
             return
 
-        # ==========================================
-        # STATE_SET: Stand still
-        # ==========================================
         if state == "STATE_SET":
             agent.stop()
             return
 
-        # ==========================================
-        # STATE_FINISHED / STATE_STANDBY: Stop
-        # ==========================================
         if state in ("STATE_FINISHED", "STATE_STANDBY"):
             agent.stop()
             return
 
-        # ==========================================
-        # STATE_PLAYING: Execute role strategy
-        # ==========================================
         if state == "STATE_PLAYING":
             _execute_role(agent)
             return
 
-        # Fallback: unknown state
-        logger.warning(f"[Game] Unknown state: {state}")
         agent.stop()
     else:
         # No referee active — go straight to playing
@@ -164,9 +142,6 @@ def game(agent) -> None:
 
 
 def _execute_role(agent):
-    """
-    Execute role-based strategy during PLAYING state.
-    """
     local_id = agent.get_config().get("id", 0)
 
     if local_id == ROLE_GOALKEEPER:
@@ -179,113 +154,145 @@ def _execute_role(agent):
 
 def _role_forward(agent):
     """
-    Forward: Chase ball and dribble towards opponent goal.
+    Forward: Move directly to ball's map position for reliability at low Hz,
+    then dribble towards goal when close.
     """
-    logger = agent.get_logger()
-
     if not agent.get_if_ball():
-        logger.debug("[Forward] Ball not detected, searching...")
         agent.state_machine_runners['find_ball']()
         return
 
     ball_dist = agent.get_ball_distance()
-    chase_dist = agent.default_chase_distance
 
-    if ball_dist > chase_dist:
-        # Far from ball: use chase FSM to approach
-        logger.debug(f"[Forward] Chasing ball (dist={ball_dist:.2f})")
-        agent.state_machine_runners['chase_ball']()
+    # If very close to ball, dribble towards goal
+    if ball_dist < 0.8:
+        _dribble_towards_goal(agent)
         return
 
-    # Close to ball: dribble towards goal directly
-    # DO NOT call chase_ball FSM here - it would enter 'arrived' and stop
-    _dribble_towards_goal(agent)
+    # Far from ball: move directly to ball's map position
+    # This is more reliable than chase_ball FSM at low control frequency
+    ball_map = agent.get_ball_pos_in_map()
+    if ball_map is not None:
+        _move_to_position(agent, float(ball_map[0]), float(ball_map[1]))
+    else:
+        # Fallback to chase_ball FSM
+        agent.state_machine_runners['chase_ball']()
 
 
 def _role_defender(agent):
     """
-    Defender: Stay in defensive position, chase ball if it's in our half.
+    Defender: Aggressive ball chase in our half, position hold otherwise.
+    Uses direct position movement for low-Hz reliability.
     """
-    logger = agent.get_logger()
-
     if not agent.get_if_ball():
-        # No ball visible, go to defensive position
-        agent.state_machine_runners['go_back_to_field'](
-            aim_x=-2.0, aim_y=0.0, aim_yaw=0
-        )
+        _move_to_position(agent, -2.0, 0.0)
         return
 
     ball_pos = agent.get_ball_pos_in_map()
     my_pos = agent.get_self_pos()
+    ball_dist = agent.get_ball_distance()
 
     if ball_pos is not None and my_pos is not None:
-        ball_x = ball_pos[0] if hasattr(ball_pos, '__len__') else 0
+        ball_x = float(ball_pos[0])
 
-        # If ball is in our half (negative X for red), chase it
-        if ball_x < 0.5:
-            ball_dist = agent.get_ball_distance()
-            if ball_dist > agent.default_chase_distance:
-                agent.state_machine_runners['chase_ball']()
-                return
-            # Close enough, clear the ball (kick towards opponent goal)
+        # If ball is close, chase and dribble
+        if ball_dist < 0.8:
             _dribble_towards_goal(agent)
             return
 
-    # Ball is in opponent half or we can't see it - hold defensive position
-    agent.state_machine_runners['go_back_to_field'](
-        aim_x=-2.5, aim_y=0.0, aim_yaw=0
-    )
+        # Chase ball in our half or if close enough
+        if ball_x < 1.0 or ball_dist < 2.0:
+            _move_to_position(agent, float(ball_pos[0]), float(ball_pos[1]))
+            return
+
+    # Ball is far in opponent half - hold defensive position
+    _move_to_position(agent, -2.5, 0.0)
 
 
 def _role_goalkeeper(agent):
     """
-    Goalkeeper: Track ball Y position and stay on goal line.
-    Use goalkeeper state machine for advanced behavior.
+    Goalkeeper: Track ball Y on goal line, dive when ball is close.
+    Uses direct cmd_vel for fast response instead of slow go_back_to_field FSM.
     """
-    logger = agent.get_logger()
+    gk_x = -HALF_LENGTH + 0.3  # Goal line x position
 
     if not agent.get_if_ball():
-        # No ball, stay at center of goal
-        agent.state_machine_runners['go_back_to_field'](
-            aim_x=-HALF_LENGTH + 0.3, aim_y=0.0, aim_yaw=0
-        )
+        # No ball - go to center of goal
+        _move_to_position(agent, gk_x, 0.0)
         return
 
     ball_pos = agent.get_ball_pos_in_map()
     ball_dist = agent.get_ball_distance()
 
     if ball_pos is not None:
-        ball_x = ball_pos[0] if hasattr(ball_pos, '__len__') else 0
-        ball_y = ball_pos[1] if hasattr(ball_pos, '__len__') else 0
+        ball_x = float(ball_pos[0])
+        ball_y = float(ball_pos[1])
 
-        # If ball is very close, use the goalkeeper state machine for save
-        if ball_dist < 1.0 and ball_x < -2.0:
-            logger.debug("[Goalkeeper] Ball close, using GK state machine")
+        # If ball is very close and heading towards goal, intercept!
+        if ball_dist < 1.5 and ball_x < -2.0:
             agent.state_machine_runners['goalkeeper']()
             return
 
-        # Track ball Y position on goal line
-        target_y = max(-1.0, min(1.0, ball_y))  # Clamp to goal width
-        target_x = -HALF_LENGTH + 0.3
+        # Track ball Y on goal line (clamp to goal width ~1.3m)
+        target_y = max(-1.3, min(1.3, ball_y))
 
-        agent.state_machine_runners['go_back_to_field'](
-            aim_x=target_x, aim_y=target_y, aim_yaw=0
-        )
+        _move_to_position(agent, gk_x, target_y)
         return
 
     # Fallback
-    agent.state_machine_runners['go_back_to_field'](
-        aim_x=-HALF_LENGTH + 0.3, aim_y=0.0, aim_yaw=0
-    )
+    _move_to_position(agent, gk_x, 0.0)
+
+
+def _move_to_position(agent, target_x, target_y):
+    """
+    Fast position movement using direct cmd_vel.
+    More responsive than go_back_to_field FSM for simple positioning.
+    """
+    my_pos = agent.get_self_pos()
+    my_yaw_deg = agent.get_self_yaw()
+
+    if my_pos is None:
+        agent.cmd_vel(0, 0, 0)
+        return
+
+    dx = target_x - float(my_pos[0])
+    dy = target_y - float(my_pos[1])
+    dist = math.hypot(dx, dy)
+
+    if dist < 0.2:
+        # Close enough, stop
+        agent.cmd_vel(0, 0, 0)
+        return
+
+    # Calculate desired heading
+    target_angle = math.atan2(dy, dx)
+    yaw_rad = math.radians(my_yaw_deg)
+    angle_diff = target_angle - yaw_rad
+    # Normalize to [-pi, pi]
+    while angle_diff > math.pi:
+        angle_diff -= 2 * math.pi
+    while angle_diff < -math.pi:
+        angle_diff += 2 * math.pi
+
+    # If angle is too far off, rotate first
+    if abs(angle_diff) > 0.5:
+        agent.cmd_vel(0.0, 0.0, np.sign(angle_diff) * 0.8)
+        return
+
+    # Move forward with steering
+    speed = min(1.0, dist * 1.5)
+    # Transform to robot-local frame
+    local_vx = speed * math.cos(angle_diff)
+    local_vy = speed * math.sin(angle_diff)
+    vw = -0.5 * angle_diff  # P-control steering
+
+    agent.cmd_vel(local_vx, local_vy, max(-0.5, min(0.5, vw)))
 
 
 def _dribble_towards_goal(agent):
     """
-    Simple dribble: move forward towards opponent goal while keeping ball close.
-    Uses proportional control to steer towards goal.
+    Dribble ball towards opponent goal with aggressive forward velocity.
+    Uses proportional control to steer while pushing.
     """
-    logger = agent.get_logger()
-
     if not agent.get_if_ball():
         agent.state_machine_runners['find_ball']()
         return
@@ -294,69 +301,48 @@ def _dribble_towards_goal(agent):
     my_pos = agent.get_self_pos()
     my_yaw = agent.get_self_yaw()
 
-    if ball_pos[0] is None:
+    if ball_pos is None:
         agent.state_machine_runners['find_ball']()
         return
 
-    b_x = ball_pos[0]  # Forward
-    b_y = ball_pos[1]  # Left
+    b_x = float(ball_pos[0])  # Forward
+    b_y = float(ball_pos[1])  # Left
+    ball_dist = math.hypot(b_x, b_y)
+
+    # If ball is far, chase it first
+    if ball_dist > 0.6:
+        agent.state_machine_runners['chase_ball']()
+        return
 
     # Calculate angle to opponent goal (at +HALF_LENGTH, 0)
+    goal_angle_local = 0
     if my_pos is not None:
-        goal_dx = HALF_LENGTH - my_pos[0]
-        goal_dy = 0.0 - my_pos[1]
+        goal_dx = HALF_LENGTH - float(my_pos[0])
+        goal_dy = 0.0 - float(my_pos[1])
         goal_angle_global = math.atan2(goal_dy, goal_dx)
         yaw_rad = math.radians(my_yaw)
         goal_angle_local = goal_angle_global - yaw_rad
-        # Normalize
         while goal_angle_local > math.pi:
             goal_angle_local -= 2 * math.pi
         while goal_angle_local < -math.pi:
             goal_angle_local += 2 * math.pi
+
+    # Ball is close - AGGRESSIVE dribble
+    # Forward: push hard if ball is in front
+    if b_x > 0.02:
+        vx = min(1.5, 0.8 + 0.5 * b_x)  # Up to 1.5 m/s
     else:
-        goal_angle_local = 0
-
-    ball_dist = math.hypot(b_x, b_y)
-
-    # If ball is far, chase it first
-    if ball_dist > 0.5:
-        agent.state_machine_runners['chase_ball']()
-        return
-
-    # Ball is close - approach and push forward
-    # Simple P controller:
-    # - Forward velocity proportional to how far ball is in front
-    # - Lateral velocity to center ball
-    # - Angular velocity to align with goal
-
-    # Forward: push if ball is in front, approach if behind
-    if b_x > 0.05:
-        vx = 0.6 + 0.3 * b_x  # Push forward
-    else:
-        vx = 0.2  # Slow approach
+        vx = 0.3  # Slow approach to get behind ball
 
     # Lateral: center the ball
-    vy = -1.5 * b_y  # Move to put ball in center
+    vy = -2.0 * b_y
 
     # Angular: steer towards goal
-    vw = -0.8 * goal_angle_local
+    vw = -1.0 * goal_angle_local
 
-    # Clamp
-    vx = max(-1.0, min(1.0, vx))
-    vy = max(-1.0, min(1.0, vy))
+    # Clamp velocities
+    vx = max(-1.5, min(1.5, vx))
+    vy = max(-1.5, min(1.5, vy))
     vw = max(-1.0, min(1.0, vw))
 
-    logger.debug(f"[Dribble] cmd=({vx:.2f},{vy:.2f},{vw:.2f}) ball=({b_x:.2f},{b_y:.2f})")
     agent.cmd_vel(vx, vy, vw)
-
-
-# Keep old function names for compatibility with state machines
-def _playing_logic(agent):
-    """Fallback: basic playing without GameController."""
-    if not agent.get_if_ball():
-        agent.state_machine_runners['find_ball']()
-        return
-    if agent.get_ball_distance() > agent.default_chase_distance:
-        agent.state_machine_runners['chase_ball']()
-        return
-    _dribble_towards_goal(agent)

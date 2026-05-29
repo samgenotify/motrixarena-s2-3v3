@@ -419,6 +419,9 @@ class SimAgent:
         vel_y = float(np.clip(vel_y, -1.0, 1.0))
         vel_theta = float(np.clip(vel_theta, -1.0, 1.0))
         # We delegate to _action which handles Sim check
+        tick = getattr(self, '_debug_tick', 0)
+        if tick % 10 == 0:
+            self.logger.info(f"[CMD] vx={vel_x:.3f} vy={vel_y:.3f} vw={vel_theta:.3f}")
         self._action.cmd_vel(vel_x, vel_y, vel_theta)
 
     def move_head(self, pitch: float, yaw: float) -> None:
