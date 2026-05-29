@@ -919,3 +919,111 @@
 2026-05-29 17:43:52,432 [INFO] SimDecider: [Vision] team=blue, id=0, looking for 'robot_bp0'
 2026-05-29 17:43:52,432 [INFO] SimDecider: [Vision] Available robots: ['robot_rp0', 'robot_rp1', 'robot_rp2', 'robot_bp0', 'robot_bp1', 'robot_bp2']
 2026-05-29 17:43:52,432 [INFO] SimDecider: [Vision] Selected robot: robot_bp0
+2026-05-29 17:43:52,801 [INFO] SimDecider: [Vision] team=blue, id=1, looking for 'robot_bp1'
+2026-05-29 17:43:52,802 [INFO] SimDecider: [Vision] Available robots: ['robot_rp0', 'robot_rp1', 'robot_rp2', 'robot_bp0', 'robot_bp1', 'robot_bp2']
+2026-05-29 17:43:52,802 [INFO] SimDecider: [Vision] Selected robot: robot_bp1
+2026-05-29 17:43:53,156 [INFO] SimDecider: [Vision] team=red, id=0, looking for 'robot_rp0'
+2026-05-29 17:43:53,156 [INFO] SimDecider: [Vision] Available robots: ['robot_rp0', 'robot_rp1', 'robot_rp2', 'robot_bp0', 'robot_bp1', 'robot_bp2']
+2026-05-29 17:43:53,156 [INFO] SimDecider: [Vision] Selected robot: robot_rp0
+2026-05-29 17:43:53,516 [INFO] SimDecider: [Vision] team=blue, id=2, looking for 'robot_bp2'
+2026-05-29 17:43:53,516 [INFO] SimDecider: [Vision] Available robots: ['robot_rp0', 'robot_rp1', 'robot_rp2', 'robot_bp0', 'robot_bp1', 'robot_bp2']
+2026-05-29 17:43:53,516 [INFO] SimDecider: [Vision] Selected robot: robot_bp2
+2026-05-29 17:43:53,865 [INFO] SimDecider: [Vision] team=red, id=2, looking for 'robot_rp2'
+2026-05-29 17:43:53,865 [INFO] SimDecider: [Vision] Available robots: ['robot_rp0', 'robot_rp1', 'robot_rp2', 'robot_bp0', 'robot_bp1', 'robot_bp2']
+2026-05-29 17:43:53,865 [INFO] SimDecider: [Vision] Selected robot: robot_rp2
+2026-05-29 17:43:54,225 [INFO] SimDecider: [Vision] team=red, id=1, looking for 'robot_rp1'
+2026-05-29 17:43:54,225 [INFO] SimDecider: [Vision] Available robots: ['robot_rp0', 'robot_rp1', 'robot_rp2', 'robot_bp0', 'robot_bp1', 'robot_bp2']
+2026-05-29 17:43:54,225 [INFO] SimDecider: [Vision] Selected robot: robot_rp1
+2026-05-29 17:43:54,582 [INFO] SimDecider: [Vision] team=blue, id=0, looking for 'robot_bp0'
+2026-05-29 17:43:54,582 [INFO] SimDecider: [Vision] Available robots: ['robot_rp0', 'robot_rp1', 'robot_rp2', 'robot_bp0', 'robot_bp1', 'robot_bp2']
+2026-05-29 17:43:54,582 [INFO] SimDecider: [Vision] Selected robot: robot_bp0
+2026-05-29 17:43:54,941 [INFO] SimDecider: [Vision] team=blue, id=1, looking for 'robot_bp1'
+2026-05-29 17:43:54,941 [INFO] SimDecider: [Vision] Available robots: ['robot_rp0', 'robot_rp1', 'robot_rp2', 'robot_bp0', 'robot_bp1', 'robot_bp2']
+2026-05-29 17:43:54,941 [INFO] SimDecider: [Vision] Selected robot: robot_bp1
+2026-05-29 17:43:55,301 [INFO] SimDecider: [Vision] team=red, id=0, looking for 'robot_rp0'
+2026-05-29 17:43:55,301 [INFO] SimDecider: [Vision] Available robots: ['robot_rp0', 'robot_rp1', 'robot_rp2', 'robot_bp0', 'robot_bp1', 'robot_bp2']
+2026-05-29 17:43:55,301 [INFO] SimDecider: [Vision] Selected robot: robot_rp0
+2026-05-29 17:43:55,666 [INFO] SimDecider: [Vision] team=blue, id=2, looking for 'robot_bp2'
+2026-05-29 17:43:55,667 [INFO] SimDecider: [Vision] Available robots: ['robot_rp0', 'robot_rp1', 'robot_rp2', 'robot_bp0', 'robot_bp1', 'robot_bp2']
+2026-05-29 17:43:55,667 [INFO] SimDecider: [Vision] Selected robot: robot_bp2
+2026-05-29 17:43:56,017 [INFO] SimDecider: [Vision] team=red, id=2, looking for 'robot_rp2'
+2026-05-29 17:43:56,017 [INFO] SimDecider: [Vision] Available robots: ['robot_rp0', 'robot_rp1', 'robot_rp2', 'robot_bp0', 'robot_bp1', 'robot_bp2']
+2026-05-29 17:43:56,017 [INFO] SimDecider: [Vision] Selected robot: robot_rp2
+2026-05-29 17:43:56,372 [INFO] SimDecider: [Vision] team=red, id=1, looking for 'robot_rp1'
+2026-05-29 17:43:56,372 [INFO] SimDecider: [Vision] Available robots: ['robot_rp0', 'robot_rp1', 'robot_rp2', 'robot_bp0', 'robot_bp1', 'robot_bp2']
+2026-05-29 17:43:56,372 [INFO] SimDecider: [Vision] Selected robot: robot_rp1
+2026-05-29 17:43:56,723 [INFO] SimDecider: [Vision] team=blue, id=0, looking for 'robot_bp0'
+2026-05-29 17:43:56,724 [INFO] SimDecider: [Vision] Available robots: ['robot_rp0', 'robot_rp1', 'robot_rp2', 'robot_bp0', 'robot_bp1', 'robot_bp2']
+2026-05-29 17:43:56,724 [INFO] SimDecider: [Vision] Selected robot: robot_bp0
+2026-05-29 17:43:57,094 [INFO] SimDecider: [Vision] team=blue, id=1, looking for 'robot_bp1'
+2026-05-29 17:43:57,094 [INFO] SimDecider: [Vision] Available robots: ['robot_rp0', 'robot_rp1', 'robot_rp2', 'robot_bp0', 'robot_bp1', 'robot_bp2']
+2026-05-29 17:43:57,094 [INFO] SimDecider: [Vision] Selected robot: robot_bp1
+2026-05-29 17:43:57,448 [INFO] SimDecider: [Vision] team=red, id=0, looking for 'robot_rp0'
+2026-05-29 17:43:57,448 [INFO] SimDecider: [Vision] Available robots: ['robot_rp0', 'robot_rp1', 'robot_rp2', 'robot_bp0', 'robot_bp1', 'robot_bp2']
+2026-05-29 17:43:57,448 [INFO] SimDecider: [Vision] Selected robot: robot_rp0
+2026-05-29 17:43:57,805 [INFO] SimDecider: [Vision] team=blue, id=2, looking for 'robot_bp2'
+2026-05-29 17:43:57,805 [INFO] SimDecider: [Vision] Available robots: ['robot_rp0', 'robot_rp1', 'robot_rp2', 'robot_bp0', 'robot_bp1', 'robot_bp2']
+2026-05-29 17:43:57,805 [INFO] SimDecider: [Vision] Selected robot: robot_bp2
+2026-05-29 17:43:58,167 [INFO] SimDecider: [Vision] team=red, id=2, looking for 'robot_rp2'
+2026-05-29 17:43:58,167 [INFO] SimDecider: [Vision] Available robots: ['robot_rp0', 'robot_rp1', 'robot_rp2', 'robot_bp0', 'robot_bp1', 'robot_bp2']
+2026-05-29 17:43:58,167 [INFO] SimDecider: [Vision] Selected robot: robot_rp2
+2026-05-29 17:43:58,528 [INFO] SimDecider: [Vision] team=red, id=1, looking for 'robot_rp1'
+2026-05-29 17:43:58,528 [INFO] SimDecider: [Vision] Available robots: ['robot_rp0', 'robot_rp1', 'robot_rp2', 'robot_bp0', 'robot_bp1', 'robot_bp2']
+2026-05-29 17:43:58,528 [INFO] SimDecider: [Vision] Selected robot: robot_rp1
+2026-05-29 17:43:58,882 [INFO] SimDecider: [Vision] team=blue, id=0, looking for 'robot_bp0'
+2026-05-29 17:43:58,882 [INFO] SimDecider: [Vision] Available robots: ['robot_rp0', 'robot_rp1', 'robot_rp2', 'robot_bp0', 'robot_bp1', 'robot_bp2']
+2026-05-29 17:43:58,882 [INFO] SimDecider: [Vision] Selected robot: robot_bp0
+2026-05-29 17:43:59,248 [INFO] SimDecider: [Vision] team=blue, id=1, looking for 'robot_bp1'
+2026-05-29 17:43:59,249 [INFO] SimDecider: [Vision] Available robots: ['robot_rp0', 'robot_rp1', 'robot_rp2', 'robot_bp0', 'robot_bp1', 'robot_bp2']
+2026-05-29 17:43:59,249 [INFO] SimDecider: [Vision] Selected robot: robot_bp1
+2026-05-29 17:43:59,601 [INFO] SimDecider: [Vision] team=red, id=0, looking for 'robot_rp0'
+2026-05-29 17:43:59,601 [INFO] SimDecider: [Vision] Available robots: ['robot_rp0', 'robot_rp1', 'robot_rp2', 'robot_bp0', 'robot_bp1', 'robot_bp2']
+2026-05-29 17:43:59,601 [INFO] SimDecider: [Vision] Selected robot: robot_rp0
+2026-05-29 17:43:59,960 [INFO] SimDecider: [Vision] team=blue, id=2, looking for 'robot_bp2'
+2026-05-29 17:43:59,960 [INFO] SimDecider: [Vision] Available robots: ['robot_rp0', 'robot_rp1', 'robot_rp2', 'robot_bp0', 'robot_bp1', 'robot_bp2']
+2026-05-29 17:43:59,960 [INFO] SimDecider: [Vision] Selected robot: robot_bp2
+2026-05-29 17:44:00,315 [INFO] SimDecider: [Vision] team=red, id=2, looking for 'robot_rp2'
+2026-05-29 17:44:00,315 [INFO] SimDecider: [Vision] Available robots: ['robot_rp0', 'robot_rp1', 'robot_rp2', 'robot_bp0', 'robot_bp1', 'robot_bp2']
+2026-05-29 17:44:00,315 [INFO] SimDecider: [Vision] Selected robot: robot_rp2
+2026-05-29 17:44:00,673 [INFO] SimDecider: [Vision] team=red, id=1, looking for 'robot_rp1'
+2026-05-29 17:44:00,673 [INFO] SimDecider: [Vision] Available robots: ['robot_rp0', 'robot_rp1', 'robot_rp2', 'robot_bp0', 'robot_bp1', 'robot_bp2']
+2026-05-29 17:44:00,673 [INFO] SimDecider: [Vision] Selected robot: robot_rp1
+2026-05-29 17:44:01,033 [INFO] SimDecider: [Vision] team=blue, id=0, looking for 'robot_bp0'
+2026-05-29 17:44:01,034 [INFO] SimDecider: [Vision] Available robots: ['robot_rp0', 'robot_rp1', 'robot_rp2', 'robot_bp0', 'robot_bp1', 'robot_bp2']
+2026-05-29 17:44:01,034 [INFO] SimDecider: [Vision] Selected robot: robot_bp0
+2026-05-29 17:44:01,034 [INFO] SimDecider: [DBG] blue#0(FWD) pos=(0.80,0.15) yaw=86.2° ball_dist=2.13 ball_seen=True
+2026-05-29 17:44:01,034 [INFO] SimDecider: [CMD] vx=1.000 vy=0.225 vw=-0.169
+2026-05-29 17:44:01,394 [INFO] SimDecider: [Vision] team=blue, id=1, looking for 'robot_bp1'
+2026-05-29 17:44:01,394 [INFO] SimDecider: [Vision] Available robots: ['robot_rp0', 'robot_rp1', 'robot_rp2', 'robot_bp0', 'robot_bp1', 'robot_bp2']
+2026-05-29 17:44:01,394 [INFO] SimDecider: [Vision] Selected robot: robot_bp1
+2026-05-29 17:44:01,395 [INFO] SimDecider: [DBG] blue#1(DEF) pos=(0.11,0.51) yaw=95.0° ball_dist=1.86 ball_seen=True
+2026-05-29 17:44:01,395 [INFO] SimDecider: [CMD] vx=1.000 vy=-0.802 vw=0.619
+2026-05-29 17:44:01,749 [INFO] SimDecider: [Vision] team=red, id=0, looking for 'robot_rp0'
+2026-05-29 17:44:01,749 [INFO] SimDecider: [Vision] Available robots: ['robot_rp0', 'robot_rp1', 'robot_rp2', 'robot_bp0', 'robot_bp1', 'robot_bp2']
+2026-05-29 17:44:01,749 [INFO] SimDecider: [Vision] Selected robot: robot_rp0
+2026-05-29 17:44:01,749 [INFO] SimDecider: [DBG] red#0(FWD) pos=(-0.63,0.15) yaw=-119.6° ball_dist=2.43 ball_seen=True
+2026-05-29 17:44:01,749 [INFO] SimDecider: [CMD] vx=1.000 vy=0.939 vw=-0.733
+2026-05-29 17:44:02,111 [INFO] SimDecider: [Vision] team=blue, id=2, looking for 'robot_bp2'
+2026-05-29 17:44:02,111 [INFO] SimDecider: [Vision] Available robots: ['robot_rp0', 'robot_rp1', 'robot_rp2', 'robot_bp0', 'robot_bp1', 'robot_bp2']
+2026-05-29 17:44:02,111 [INFO] SimDecider: [Vision] Selected robot: robot_bp2
+2026-05-29 17:44:02,111 [INFO] SimDecider: [DBG] blue#2(GK) pos=(-3.12,-0.86) yaw=137.7° ball_dist=4.95 ball_seen=True
+2026-05-29 17:44:02,111 [INFO] SimDecider: [CMD] vx=1.000 vy=-0.726 vw=0.558
+2026-05-29 17:44:02,466 [INFO] SimDecider: [Vision] team=red, id=2, looking for 'robot_rp2'
+2026-05-29 17:44:02,467 [INFO] SimDecider: [Vision] Available robots: ['robot_rp0', 'robot_rp1', 'robot_rp2', 'robot_bp0', 'robot_bp1', 'robot_bp2']
+2026-05-29 17:44:02,467 [INFO] SimDecider: [Vision] Selected robot: robot_rp2
+2026-05-29 17:44:02,467 [INFO] SimDecider: [DBG] red#2(GK) pos=(-3.78,-0.98) yaw=-177.6° ball_dist=3.34 ball_seen=True
+2026-05-29 17:44:02,467 [INFO] SimDecider: [CMD] vx=0.000 vy=0.000 vw=1.000
+2026-05-29 17:44:02,821 [INFO] SimDecider: [Vision] team=red, id=1, looking for 'robot_rp1'
+2026-05-29 17:44:02,821 [INFO] SimDecider: [Vision] Available robots: ['robot_rp0', 'robot_rp1', 'robot_rp2', 'robot_bp0', 'robot_bp1', 'robot_bp2']
+2026-05-29 17:44:02,821 [INFO] SimDecider: [Vision] Selected robot: robot_rp1
+2026-05-29 17:44:02,821 [INFO] SimDecider: [DBG] red#1(DEF) pos=(-0.20,0.26) yaw=-68.6° ball_dist=2.59 ball_seen=True
+2026-05-29 17:44:02,821 [INFO] SimDecider: [CMD] vx=0.000 vy=0.000 vw=-1.000
+2026-05-29 17:44:03,177 [INFO] SimDecider: [Vision] team=blue, id=0, looking for 'robot_bp0'
+2026-05-29 17:44:03,177 [INFO] SimDecider: [Vision] Available robots: ['robot_rp0', 'robot_rp1', 'robot_rp2', 'robot_bp0', 'robot_bp1', 'robot_bp2']
+2026-05-29 17:44:03,177 [INFO] SimDecider: [Vision] Selected robot: robot_bp0
+2026-05-29 17:44:03,534 [INFO] SimDecider: [Vision] team=blue, id=1, looking for 'robot_bp1'
+2026-05-29 17:44:03,534 [INFO] SimDecider: [Vision] Available robots: ['robot_rp0', 'robot_rp1', 'robot_rp2', 'robot_bp0', 'robot_bp1', 'robot_bp2']
+2026-05-29 17:44:03,534 [INFO] SimDecider: [Vision] Selected robot: robot_bp1
+2026-05-29 17:44:03,889 [INFO] SimDecider: [Vision] team=red, id=0, looking for 'robot_rp0'
+2026-05-29 17:44:03,889 [INFO] SimDecider: [Vision] Available robots: ['robot_rp0', 'robot_rp1', 'robot_rp2', 'robot_bp0', 'robot_bp1', 'robot_bp2']
+2026-05-29 17:44:03,889 [INFO] SimDecider: [Vision] Selected robot: robot_rp0
