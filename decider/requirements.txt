@@ -10,3 +10,6 @@ transitions>=0.8.0
 
 # ZeroMQ for simulation communication
 pyzmq>=22.0.0
+
+# Plotting (used by strategy visualization)
+matplotlib>=3.0.0

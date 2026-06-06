@@ -1,8 +1,16 @@
 # user_entry.py
 #
-#   @description:   Logic entry point for mos-brain decider (Simplified)
-#                   Game logic is separated into game() function.
+#   @description:   3v3 Soccer Strategy for MotrixArena S2
+#                   v32: v25 champion core + new-rule compliance
 #
+#   Compliance features (active only with referee):
+#     - Game state machine: Initial/Ready/Set/Playing/Finished
+#     - Set play positioning: kickoff/corner/goal_kick/throw_in/free_kick
+#     - Ball holding avoidance (4.5s field / 9s GK, rule limit 5/10)
+#     - Ball stall avoidance (8s, rule limit 10)
+#     - Boundary safety clamp
+#
+#   Without referee: behavior identical to v25 champion.
 
 import time
 import traceback
@@ -19,495 +27,536 @@ if CUR_DIR not in sys.path:
 from logic.sub_statemachines import chase_ball, find_ball, go_back_to_field, dribble
 from logic.policy_statemachines import goalkeeper
 
-import csv
-from datetime import datetime
 
-class DataRecorder:
-    def __init__(self, log_dir):
-        self.log_dir = log_dir
-        if not os.path.exists(log_dir):
-            os.makedirs(log_dir)
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        self.filepath = os.path.join(log_dir, f"dribble_debug_{timestamp}.csv")
-        self.file = open(self.filepath, 'w', newline='')
-        self.writer = csv.writer(self.file)
-        self.header_written = False
-        
-    def log(self, data):
-        if not self.header_written:
-            self.writer.writerow(data.keys())
-            self.header_written = True
-        self.writer.writerow(data.values())
-        self.file.flush()
+# ============================================================
+# Field constants for S league (9x6m)
+# ============================================================
+FIELD_LENGTH = 9.0
+FIELD_WIDTH = 6.0
+HALF_LENGTH = FIELD_LENGTH / 2.0
+HALF_WIDTH = FIELD_WIDTH / 2.0
+GOAL_HALF = 1.3  # goal opening half-width
 
-    def close(self):
-        self.file.close()
+# Role assignments by local id (0-based within team)
+ROLE_FORWARD = 0
+ROLE_DEFENDER = 1
+ROLE_GOALKEEPER = 2
 
-class AdvancedDribbler:
-    def __init__(self, agent):
-        self.agent = agent
-        self.logger = agent.get_logger().get_child("AdvDribble")
-        
-        # Instrumentation
-        # Use project-relative debug_logs directory (parent of `decider`)
-        log_dir = os.path.abspath(os.path.join(CUR_DIR, '..', 'debug_logs'))
-        print(f"[DEBUG] DataRecorder log_dir: {log_dir}")
-        self.recorder = DataRecorder(log_dir)
-        
-        # Parameters
-        self.bturn_p = 2.0
-        self.side_correction_p = 2.5
-        self.forward_p = 1.0
-        
-        self.setup_dist = 0.40
-        self.dribble_dist = 0.20 # Ball should be slightly in front
-        self.max_fw_vel = 0.8
-        
-        self.field_length = 14.0 # Default M
-        self.field_width = 9.0
-        
-        # Anti-Oscillation
-        self.spread_factor_max = 20.0 # degrees
-        self.spread_factor_min = 5.0 # degrees
+# Position targets for each role (X, Y) — own-side home positions
+ROLE_POSITIONS = {
+    ROLE_FORWARD:    (-1.0,  0.0),
+    ROLE_DEFENDER:   (-2.5,  0.0),
+    ROLE_GOALKEEPER: (-HALF_LENGTH + 0.3,  0.0),
+}
 
-        # Hysteresis to avoid mode chattering near b_x threshold
-        self.turn_to_ball_enter_bx = 0.03
-        self.turn_to_ball_exit_bx = 0.08
-        self.turn_to_ball_mode = False
-        self.direction_consistency_bx = 0.12  # keep turn direction consistent near mode boundary
-        
-    def get_target_vector(self):
-        """
-        Calculate dribbling direction (Vector Field)
-        COORDINATE SYSTEM (NEW):
-        - Origin: Center of field
-        - X+: Points to Opponent Goal (Front)
-        - Y+: Points to Left side
-        - Field Length: X-axis
-        - Field Width: Y-axis
-        """
-        # 1. Goal Attraction
-        # Goal is at (L/2, 0) - forward on X, center on Y
-        goal_x = self.field_length / 2.0
-        goal_y = 0.0
-        
-        my_pos = self.agent.get_self_pos()
-        if my_pos is None:
-            return np.array([1.0, 0.0]), 0 # Default forward (X+)
-            
-        # Global Vector to Goal
-        g_dx = goal_x - my_pos[0]
-        g_dy = goal_y - my_pos[1]
-        
-        # 2. Boundary Repulsion (Side Lines are at Y = +/- W/2)
-        # If too close to side lines, push towards center (Y=0)
-        dist_to_left = (self.field_width / 2.0) - my_pos[1]   # Y+ is left
-        dist_to_right = my_pos[1] - (-self.field_width / 2.0)  # Y- is right
-        
-        repulsion_y = 0.0
-        margin = 1.0 # Buffer
-        
-        # If close to Left Boundary (Y > 0), push Right (Y-)
-        if dist_to_left < margin:
-            repulsion_y -= (margin - dist_to_left) * 2.0
-            
-        # If close to Right Boundary (Y < 0), push Left (Y+)
-        if dist_to_right < margin:
-            repulsion_y += (margin - dist_to_right) * 2.0
-            
-        # Combine
-        final_dx = g_dx  # Goal attraction provides X component
-        final_dy = g_dy + repulsion_y
-        
-        norm = math.hypot(final_dx, final_dy)
-        if norm < 0.001:
-            return np.array([1.0, 0.0]), 0 # Default forward (X+)
-            
-        target_vec = np.array([final_dx / norm, final_dy / norm])
-        
-        # Zone Safety check for Deadband
-        # If central area (Y close to 0), safe.
-        is_safe = (abs(my_pos[1]) < self.field_width / 3.0)
-        
-        return target_vec, is_safe
+# v32: Set-play formations (own-side perspective, red=left)
+KICKOFF_POSITIONS_RED = {
+    ROLE_FORWARD:    (-0.5,  0.0),
+    ROLE_DEFENDER:   (-2.5,  0.0),
+    ROLE_GOALKEEPER: (-HALF_LENGTH + 0.3,  0.0),
+}
+WALL_POSITIONS_RED = {
+    ROLE_FORWARD:    (-2.0,  0.0),
+    ROLE_DEFENDER:   (-3.0,  0.5),
+    ROLE_GOALKEEPER: (-HALF_LENGTH + 0.3, -0.5),
+}
 
-    def run(self):
-        if not self.agent.get_if_ball():
-            self.logger.info("Lost ball, stopping.")
-            self.agent.cmd_vel(0,0,0)
-            return
+# ============================================================
+# v32: Rule-compliance constants
+# ============================================================
+BALL_HOLD_LIMIT_FIELD = 4.5    # rule: 5s, we back off at 4.5
+BALL_HOLD_LIMIT_GK = 9.0       # rule: 10s for GK
+BALL_STALL_RADIUS = 0.15       # ball must move this much (m) to count as "moved"
+BALL_STALL_TIME = 8.0          # rule: 10s, we trigger at 8
+NEAR_BALL_DIST = 0.6           # within this distance counts as "near ball"
+FIELD_BOUNDARY_MARGIN = 0.5    # stay this far inside boundary
 
-        # 1. Get State
-        # Ball in Robot Body Frame [Forward, Left] (X+前, Y+左)
-        ball_pos = self.agent.get_ball_pos()
-        b_x = ball_pos[0]  # Forward
-        b_y = ball_pos[1]  # Left
-        
-        my_pos = self.agent.get_self_pos()
-        my_yaw = self.agent.get_self_yaw()
-        
-        # [NEW] Ball Behind Check - Turn to face ball first
-        # If ball is behind robot (b_x < threshold), we need to turn around
-        ball_dist = math.hypot(b_x, b_y)
-        ball_angle_to_robot = math.atan2(b_y, b_x)  # Angle from robot forward to ball
-        ball_angle_deg = math.degrees(ball_angle_to_robot)
-        self.logger.info(
-            f"[AdvDribble] ball_angle_to_robot={ball_angle_to_robot:.4f}rad ({ball_angle_deg:.1f}deg), b=({b_x:.3f}, {b_y:.3f})"
-        )
-        
-        prev_turn_to_ball_mode = self.turn_to_ball_mode
-        if self.turn_to_ball_mode:
-            self.turn_to_ball_mode = b_x < self.turn_to_ball_exit_bx
-        else:
-            self.turn_to_ball_mode = b_x < self.turn_to_ball_enter_bx
+# GC state constants (must match gamecontroller.py)
+GC_INITIAL = 0
+GC_READY = 1
+GC_SET = 2
+GC_PLAYING = 3
+GC_FINISHED = 4
 
-        if self.turn_to_ball_mode != prev_turn_to_ball_mode:
-            self.logger.info(
-                f"[AdvDribble] MODE_SWITCH turn_to_ball={self.turn_to_ball_mode} b_x={b_x:.3f} (enter<{self.turn_to_ball_enter_bx:.2f}, exit<{self.turn_to_ball_exit_bx:.2f})"
-            )
+# Set play constants
+SP_NONE = 0
+SP_KICK_OFF = 1
+SP_KICK_IN = 2
+SP_CORNER_KICK = 3
+SP_GOAL_KICK = 4
+SP_DIRECT_FREE = 5
+SP_INDIRECT_FREE = 6
 
-        if self.turn_to_ball_mode:  # Ball behind mode (with hysteresis)
-            # Turn towards the ball instead of dribbling
-            turn_speed = 1.5 * ball_angle_to_robot  # P-control to face ball
-            turn_speed = max(min(turn_speed, 1.5), -1.5)  # Clamp
-            
-            # Also move slightly towards ball if it's far
-            approach_speed = 0.0
-            if ball_dist > 0.3:
-                # Move forward/backward based on ball position
-                # If ball is behind, we should approach after turning
-                approach_speed = 0.3 * b_x / (ball_dist + 0.01)  # Will be negative if ball behind
-                approach_speed = max(min(approach_speed, 0.5), -0.3)
-            
-            self.logger.info(f"[AdvDribble] TURN_TO_BALL: BallAngle={ball_angle_deg:.1f} TurnSpd={turn_speed:.2f}")
-            self.agent.cmd_vel(approach_speed, 0, turn_speed)
-            self.agent.move_head(math.inf, math.inf)
-            
-            # Log for debugging
-            log_data = {
-                "time": time.time(),
-                "rx": my_pos[0] if my_pos is not None else 0,
-                "ry": my_pos[1] if my_pos is not None else 0,
-                "ryaw": my_yaw,
-                "ball_x": b_x,
-                "ball_y": b_y,
-                "t_vec_gx": 0, "t_vec_gy": 0,
-                "t_ang_local": ball_angle_deg,
-                "cmd_x": approach_speed, "cmd_y": 0, "cmd_w": turn_speed,
-                "aligned": 0, "safe_zone": 0,
-                "err_y": 0, "err_x": 0
-            }
-            self.recorder.log(log_data)
-            return  # Exit early, don't do normal dribble logic
-        
-        # Target Vector
-        target_vec_global, is_safe_zone = self.get_target_vector()
-        
-        # [DEBUG] Log coordinate values for diagnosis
-        self.logger.info(f"[COORD] pos={my_pos}, yaw={my_yaw:.1f}, t_vec={target_vec_global}")
-        
-        # Rotate Target to Local Frame
-        yaw_rad = math.radians(my_yaw)
-        # NEW Coordinate System: 
-        # Global: X(Forward), Y(Left)
-        # Body: X(Forward), Y(Left)
-        # Robot Yaw=0 means facing X+ (Forward)
-        # Rotation: v_body = R(-yaw) * v_global
-        # t_local_x = Gx * cos(yaw) + Gy * sin(yaw)
-        # t_local_y = -Gx * sin(yaw) + Gy * cos(yaw)
-        
-        t_local_x = target_vec_global[0] * math.cos(yaw_rad) + target_vec_global[1] * math.sin(yaw_rad)
-        t_local_y = -target_vec_global[0] * math.sin(yaw_rad) + target_vec_global[1] * math.cos(yaw_rad)
-        
-        target_angle_local = math.atan2(t_local_y, t_local_x)
-        target_angle_deg = math.degrees(target_angle_local)
-        
-        # 2. Omnidirectional Control
-        
-        # A. Turn (da)
-        # Minimize angle to target
-        da = -self.bturn_p * target_angle_local  # invert sign to align with TURN_TO_BALL rotation direction
-        
-        # [NEW] Dampen Turn when very close to ball to prevent oscillation ("Large angle change" issue)
-        # If b_x is small (e.g. 0.1), simple turning changes relative geometry fast.
-        # Scale down da when close.
-        if my_pos is not None: # Ensure we have data
-             # Use b_x from previous step or estimate? 
-             # Actually we calculated b_x_virt later. 
-             # Let's move da clamping/scaling to AFTER b_x_virt calculation or estimate it here.
-             # Better: Apply scaling at the end of this block or simply use dist to ball.
-             dist_to_ball = math.hypot(b_x, b_y)
-             turn_damp = max(0.4, min(1.0, dist_to_ball / 0.4))
-             da *= turn_damp
-        
-        # B. Orbit/Sway (dy)
-        # We want the ball to be on the "line" to target.
-        # Project Ball Pos onto the Normal of Target Vector?
-        # Simpler: Rotate Ball Pos so that Target Vector lies on X-axis (Virtual Frame)
-        # In Virtual Frame:
-        # Ball Y should be 0.
-        # Ball X should be setup_dist.
-        
-        # Rotation from Robot Body to Virtual Target Frame
-        # rot = -target_angle_local
-        c_r = math.cos(-target_angle_local)
-        s_r = math.sin(-target_angle_local)
-        
-        b_x_virt = b_x * c_r - b_y * s_r
-        b_y_virt = b_x * s_r + b_y * c_r
-        
-        # PID Controls in Virtual Frame
-        # Lateral Error: We want b_y_virt = 0
-        err_y = b_y_virt
-        cmd_y_virt = self.side_correction_p * err_y 
-        
-        # Forward Error: We want b_x_virt = setup_dist (or dribble_dist if aligned)
-        # Adaptive Deadband
-        deadband = self.spread_factor_max if is_safe_zone else self.spread_factor_min
-        # [NEW] Require Ball to be In Front (b_x_virt > 0) to consider Aligned
-        aligned = abs(target_angle_deg) < deadband and abs(err_y) < 0.1 and b_x_virt > 0.1
-        
-        # [NEW] 临门一脚 Mode: Near goal, be more aggressive
-        # Goal is at X = field_length/2, so threshold is ~80% of the way
-        near_goal = my_pos is not None and my_pos[0] > self.field_length * 0.35
-        if near_goal:
-            # Relax alignment requirement
-            aligned = abs(target_angle_deg) < 25.0 and b_x_virt > 0.05
-        
-        # [NEW] Interpolate Target Distance for smooth transition (Creep)
-        target_dist = self.setup_dist
-        if aligned:
-            target_dist = self.dribble_dist
-        elif abs(target_angle_deg) < 25.0:
-             # Interpolate between setup_dist (0.4) and dribble_dist (0.2) based on alignment
-             # 25 deg -> 0.4, 5 deg -> 0.2
-             ratio = (25.0 - abs(target_angle_deg)) / (25.0 - 5.0)
-             ratio = max(0.0, min(1.0, ratio))
-             target_dist = self.setup_dist - ratio * (self.setup_dist - self.dribble_dist)
 
-        err_x = b_x_virt - target_dist
-        
-        # Velocity Damping (Anti-Oscillation)
-        # Don't rush if not aligned
-        forward_factor = 1.0
-        if not aligned:
-            # Dampen based on angle error but allow "creep" if error is not huge
-            angle_err = abs(target_angle_deg)
-            if angle_err < 25.0:
-                # Creep zone: Interpolate 1.0 -> 0.2
-                forward_factor = 1.0 - (angle_err / 25.0) * 0.5 
+# ============================================================
+# v32: Per-robot state trackers
+# ============================================================
+class RuleComplianceState:
+    """Tracks ball-holding time and stall status for rule avoidance.
+    Each robot instance gets one of these."""
+    def __init__(self):
+        self.near_ball_time = 0.0
+        # Stall tracking
+        self.last_ball_x = 0.0
+        self.last_ball_y = 0.0
+        self.stall_time = 0.0
+        self.last_check_time = 0.0
+
+
+def update_rule_state(agent, rule_state, dt, with_rule_avoidance):
+    """Update ball-holding and stall tracking.
+    Returns (near_ball_time_exceeded, ball_stalled)."""
+    if not with_rule_avoidance:
+        rule_state.near_ball_time = 0.0
+        rule_state.stall_time = 0.0
+        return False, False
+
+    ball_seen = agent.get_if_ball()
+    ball_dist = agent.get_ball_distance() if ball_seen else 999.0
+
+    # Ball holding tracker
+    if ball_dist < NEAR_BALL_DIST:
+        rule_state.near_ball_time += dt
+    else:
+        rule_state.near_ball_time = 0.0
+
+    near_exceeded = rule_state.near_ball_time > BALL_HOLD_LIMIT_FIELD
+
+    # Ball stall detector
+    ball_map = agent.get_ball_pos_in_map()
+    now = time.time()
+    stalled = False
+    if ball_map is not None:
+        bx, by = float(ball_map[0]), float(ball_map[1])
+        if now - rule_state.last_check_time > 0.5:
+            moved = math.hypot(bx - rule_state.last_ball_x, by - rule_state.last_ball_y)
+            if moved > BALL_STALL_RADIUS:
+                rule_state.stall_time = 0.0
             else:
-                forward_factor = 0.0
-        
-        # [NEW] Near goal, always push forward aggressively
-        if near_goal and b_x_virt > 0.05:
-            forward_factor = max(forward_factor, 0.8)  # At least 80% power near goal
-            
-        cmd_x_virt = self.forward_p * err_x * forward_factor
-        
-        # [NEW] Minimum Push Velocity when Aligned
-        # Always maintain minimum forward velocity when aligned (PUSH mode)
-        if aligned:
-             if cmd_x_virt < 0.5:  # Always push forward at min 0.5
-                 cmd_x_virt = 0.5
-        
-        # [NEW] Near goal, even if not aligned, keep pushing forward
-        if near_goal and b_x_virt > 0.1:
-            if cmd_x_virt < 0.4:  # Minimum near-goal push
-                cmd_x_virt = 0.4
-        
-        
-        # [NEW] Clamp Virtual Velocities individually first
-        cmd_x_virt = max(min(cmd_x_virt, self.max_fw_vel), -0.5)
-        # cmd_y_virt is proportional to error, clamping it is key
-        # Using a slightly higher limit for lateral correction if needed, but safe to clamp to max velocity
-        cmd_y_virt = max(min(cmd_y_virt, self.max_fw_vel), -self.max_fw_vel)
-        
-        # Transform Commands back to Body Frame
-        c = math.cos(target_angle_local)
-        s = math.sin(target_angle_local)
-        
-        cmd_x = cmd_x_virt * c - cmd_y_virt * s
-        cmd_y = cmd_x_virt * s + cmd_y_virt * c
-        
-        # [NEW] Global Clamp on Linear Velocity
-        lin_vel_norm = math.hypot(cmd_x, cmd_y)
-        if lin_vel_norm > self.max_fw_vel:
-            scale = self.max_fw_vel / lin_vel_norm
-            cmd_x *= scale
-            cmd_y *= scale
-            
-        # [NEW] Clamp Angular Velocity
-        da = max(min(da, 1.5), -1.5)
+                rule_state.stall_time += now - rule_state.last_check_time
+            rule_state.last_ball_x = bx
+            rule_state.last_ball_y = by
+            rule_state.last_check_time = now
+        stalled = rule_state.stall_time > BALL_STALL_TIME
 
-        # Keep angular direction consistent with TURN_TO_BALL near threshold
-        # to avoid opposite commands around mode boundary.
-        if b_x < self.direction_consistency_bx and abs(ball_angle_to_robot) > 0.2 and abs(da) > 1e-6:
-            da = math.copysign(abs(da), ball_angle_to_robot)
-        
-        # LOGGING
-        log_data = {
-            "time": time.time(),
-            "rx": my_pos[0] if my_pos is not None else 0,
-            "ry": my_pos[1] if my_pos is not None else 0,
-            "ryaw": my_yaw,
-            "ball_x": b_x,
-            "ball_y": b_y,
-            "t_vec_gx": target_vec_global[0],
-            "t_vec_gy": target_vec_global[1],
-            "t_ang_local": target_angle_deg,
-            "cmd_x": cmd_x,
-            "cmd_y": cmd_y,
-            "cmd_w": da,
-            "aligned": int(aligned),
-            "safe_zone": int(is_safe_zone),
-            "err_y": err_y,
-            "err_x": err_x
-        }
-        self.recorder.log(log_data)
-        
-        # 3. Final Command
-        self.logger.info(f"[AdvDribble] Safe:{is_safe_zone} Alg:{aligned} T_Ang:{target_angle_deg:.1f} Cmd:({cmd_x:.2f}, {cmd_y:.2f}, {da:.2f})")
-        self.agent.cmd_vel(cmd_x, cmd_y, da)
-        self.agent.move_head(math.inf, math.inf)
+    return near_exceeded, stalled
 
+
+# ============================================================
+# Init / Loop
+# ============================================================
 def init(agent) -> None:
-    agent.get_logger().info("[UserEntry] Initializing Logic...")
-    
+    agent.get_logger().info("[UserEntry] Initializing v32 3v3 Strategy...")
+    agent._debug_tick = 0
+    agent._last_loop_time = time.time()
+
     # Initialize State Machines
     agent.chase_ball_machine = chase_ball.ChaseBallStateMachine(agent)
     agent.find_ball_machine = find_ball.FindBallStateMachine(agent)
     agent.go_back_machine = go_back_to_field.GoBackToFieldStateMachine(agent)
     agent.dribble_machine = dribble.DribbleStateMachine(agent)
     agent.goalkeeper_machine = goalkeeper.GoalkeeperStateMachine(agent)
-    
-    # Initialize Advanced Dribbler
-    agent.adv_dribbler = AdvancedDribbler(agent)
 
     agent.state_machine_runners = {
         "chase_ball": agent.chase_ball_machine.run,
         "find_ball": agent.find_ball_machine.run,
         "go_back_to_field": agent.go_back_machine.run,
         "dribble": agent.dribble_machine.run,
-        "adv_dribble": agent.adv_dribbler.run, # Register new runner
         "stop": agent.stop,
         "goalkeeper": agent.goalkeeper_machine.run,
     }
-    
+
     # Basic Configs
-    agent.default_chase_distance = agent.get_config().get("chase",{}).get("default_chase_distance", 0.7)
-    
+    agent.default_chase_distance = agent.get_config().get("chase", {}).get("default_chase_distance", 0.7)
+
+    # Determine role from config id (local id within team, 0-2)
+    local_id = agent.get_config().get("id", 0)
+    agent.role = local_id  # 0=forward, 1=defender, 2=goalkeeper
+    role_names = {0: "Forward", 1: "Defender", 2: "Goalkeeper"}
+    agent.get_logger().info(f"[UserEntry] Robot id={local_id}, Role={role_names.get(local_id, 'Unknown')}")
+
+    # v32: Per-robot rule compliance tracker
+    agent.rule_state = RuleComplianceState()
+
     # Relocalize
     agent.relocate()
 
+
 def loop(agent) -> None:
     try:
-        game(agent)
+        now = time.time()
+        dt = now - agent._last_loop_time
+        agent._last_loop_time = now
+        agent._debug_tick += 1
+
+        if agent._debug_tick % 50 == 0:
+            try:
+                my_pos = agent.get_self_pos()
+                my_yaw = agent.get_self_yaw()
+                local_id = agent.get_config().get("id", 0)
+                color = getattr(agent, 'color', '?')
+                role_names = {0: "FWD", 1: "DEF", 2: "GK"}
+                ball_seen = agent.get_if_ball()
+                ball_dist = agent.get_ball_distance() if ball_seen else -1
+                logger = agent.get_logger()
+                pos_str = f"({my_pos[0]:.2f},{my_pos[1]:.2f})" if my_pos is not None else "None"
+                logger.info(
+                    f"[DBG] {color}#{local_id}({role_names.get(local_id,'?')}) "
+                    f"pos={pos_str} yaw={my_yaw:.1f}° "
+                    f"ball_dist={ball_dist:.2f} nb_t={agent.rule_state.near_ball_time:.1f}s"
+                )
+            except Exception as de:
+                agent.get_logger().warning(f"[DBG-ERR] {de}")
+        game(agent, dt)
     except Exception as e:
         agent.get_logger().error(f"Error in user_entry loop: {e}")
         traceback.print_exc()
 
-def game(agent) -> None:
-    # # --- Debug Coordinates ---
-    # from debug_coords import debug_coords
-    # debug_coords(agent)
-    
-    # --- Select Test to Run ---
-    # _playing_logic(agent)        # Default: Full Playing Logic
-    # _test_adv_dribble(agent)     # TEST ARGUMENT: Using Advanced Dribble
-    # _playing_logic(agent)
-    _gc_test_go_back_to_field(agent)
 
-def _gc_test_go_back_to_field(agent):
-    """
-    GameController test using go_back_to_field.
-    """
+def game(agent, dt=0.02) -> None:
+    """Main game loop with GameController integration.
+    When no referee is active, falls through to direct PLAYING mode (v25 behavior)."""
     gc = agent.gamecontroller
     state = gc.game_state
-    
-    logger = agent.get_logger()
 
-    
-    if state == "STATE_INITIAL" or state == "STATE_READY":
-        agent.state_machine_runners['go_back_to_field'](aim_x = 1.3, aim_y = 0.001, aim_yaw = 150.)
-        return
+    gc_active = (gc.game_state_int != GC_INITIAL
+                 or gc.set_play != SP_NONE
+                 or gc.secs_remaining != 0
+                 or gc.game_state == "STATE_PLAYING")
 
-    if state == "STATE_SET":
-        logger.info("[GC_TEST] Action: STATE_SET -> stop")
+    if gc_active:
+        # Update rule-compliance tracking
+        near_exceeded, ball_stalled = update_rule_state(
+            agent, agent.rule_state, dt, with_rule_avoidance=True)
+
+        if state in ("STATE_INITIAL",):
+            # Pre-game: hold formation
+            _go_to_role_home(agent)
+            return
+
+        if state == "STATE_READY":
+            # Set play positioning phase (robots can move)
+            _set_play_positioning(agent, gc)
+            return
+
+        if state == "STATE_SET":
+            # SET: must be stationary (rule)
+            agent.stop()
+            return
+
+        if state in ("STATE_FINISHED", "STATE_STANDBY"):
+            agent.stop()
+            return
+
+        if state == "STATE_PLAYING":
+            _execute_role(agent, with_rule_avoidance=True,
+                          near_exceeded=near_exceeded, ball_stalled=ball_stalled)
+            return
+
         agent.stop()
-        return
+    else:
+        # No referee — identical to v25 behavior
+        update_rule_state(agent, agent.rule_state, dt, with_rule_avoidance=False)
+        _execute_role(agent, with_rule_avoidance=False,
+                      near_exceeded=False, ball_stalled=False)
 
-    elif state in ("STATE_FINISHED", "STATE_STANDBY"):
-        logger.info(f"[GC_TEST] Action: {state} -> stop")
-        agent.stop()
-        return
 
-    if state == "STATE_PLAYING":
-        logger.info("[GC_TEST] Action: STATE_PLAYING -> active behavior")
-        
-        # 1. Look for ball
+# ============================================================
+# Set Play Positioning (v32)
+# ============================================================
+def _set_play_positioning(agent, gc):
+    """Position robot correctly during set plays (READY phase)."""
+    sp = gc.set_play
+    we_kick = (gc.kicking_side == "left")  # we are red=left
+
+    role = agent.role
+
+    if sp == SP_KICK_OFF:
+        pos = KICKOFF_POSITIONS_RED[role] if we_kick else WALL_POSITIONS_RED[role]
+        _move_to_position(agent, pos[0], pos[1])
+
+    elif sp == SP_KICK_IN:
+        if we_kick and role == ROLE_FORWARD:
+            ball_map = agent.get_ball_pos_in_map()
+            if ball_map is not None:
+                _move_to_position(agent, float(ball_map[0]), float(ball_map[1]))
+            else:
+                _move_to_position(agent, -1.0, 0.0)
+        else:
+            _go_to_role_home(agent)
+
+    elif sp == SP_CORNER_KICK:
+        if we_kick and role == ROLE_FORWARD:
+            ball_map = agent.get_ball_pos_in_map()
+            if ball_map is not None:
+                _move_to_position(agent, float(ball_map[0]), float(ball_map[1]))
+            else:
+                _move_to_position(agent, 4.0, 0.0)
+        elif role == ROLE_GOALKEEPER:
+            _move_to_position(agent, -HALF_LENGTH + 0.3, 0.0)
+        elif role == ROLE_DEFENDER:
+            _move_to_position(agent, -3.5, 0.0)
+        else:
+            _go_to_role_home(agent)
+
+    elif sp == SP_GOAL_KICK:
+        if we_kick and role == ROLE_DEFENDER:
+            ball_map = agent.get_ball_pos_in_map()
+            if ball_map is not None:
+                _move_to_position(agent, float(ball_map[0]), float(ball_map[1]))
+            else:
+                _move_to_position(agent, -HALF_LENGTH + 0.5, 0.0)
+        elif role == ROLE_GOALKEEPER:
+            _move_to_position(agent, -HALF_LENGTH + 0.3, 0.0)
+        elif role == ROLE_FORWARD:
+            _move_to_position(agent, 2.0, 0.0)
+        else:
+            _go_to_role_home(agent)
+
+    elif sp in (SP_DIRECT_FREE, SP_INDIRECT_FREE):
+        if we_kick and role == ROLE_FORWARD:
+            ball_map = agent.get_ball_pos_in_map()
+            if ball_map is not None:
+                _move_to_position(agent, float(ball_map[0]), float(ball_map[1]))
+            else:
+                _go_to_role_home(agent)
+        else:
+            pos = WALL_POSITIONS_RED[role]
+            _move_to_position(agent, pos[0], pos[1])
+
+    else:
+        _go_to_role_home(agent)
+
+
+def _go_to_role_home(agent):
+    """Move to role's home position."""
+    role = agent.role
+    pos = ROLE_POSITIONS.get(role, (-1.0, 0.0))
+    _move_to_position(agent, pos[0], pos[1])
+
+
+# ============================================================
+# Role Behaviors
+# ============================================================
+def _execute_role(agent, with_rule_avoidance=False,
+                  near_exceeded=False, ball_stalled=False):
+    local_id = agent.get_config().get("id", 0)
+
+    if local_id == ROLE_GOALKEEPER:
+        _role_goalkeeper(agent, with_rule_avoidance, near_exceeded, ball_stalled)
+    elif local_id == ROLE_DEFENDER:
+        _role_defender(agent, with_rule_avoidance, near_exceeded, ball_stalled)
+    else:
+        _role_forward(agent, with_rule_avoidance, near_exceeded, ball_stalled)
+
+
+def _role_forward(agent, with_rule_avoidance=False,
+                  near_exceeded=False, ball_stalled=False):
+    """Forward: chase ball, dribble to goal.
+    v32: ball-holding + stall avoidance when referee active."""
+    # v32: Ball holding avoidance
+    if with_rule_avoidance and near_exceeded:
         if not agent.get_if_ball():
-            logger.info("[GC_TEST] -> find_ball (ball not detected)")
             agent.state_machine_runners['find_ball']()
             return
-
-        # 2. Chase Ball
-        ball_dist = agent.get_ball_distance()
-        if ball_dist > agent.default_chase_distance:
-            logger.info(f"[GC_TEST] -> chase_ball (distance={ball_dist:.2f} > {agent.default_chase_distance:.2f})")
-            agent.state_machine_runners['chase_ball']()
+        ball_map = agent.get_ball_pos_in_map()
+        if ball_map is not None:
+            # Back off from ball
+            _move_to_position(agent, float(ball_map[0]) - 1.0, float(ball_map[1]) + 0.5)
             return
-    
-        # 3. Ball Interaction (Close enough) -> NEW Dribble
-        logger.info(f"[GC_TEST] -> adv_dribble (distance={ball_dist:.2f} <= {agent.default_chase_distance:.2f})")
-        agent.state_machine_runners['adv_dribble']()
-        return
-    
-    logger.warning(f"[GC_TEST] Unknown state: {state} -> stop")
-    agent.stop()  
 
-def _test_agents(agent):
-    """
-    测试各状态机
-    """
-    # 3调用kick
-    agent.state_machine_runners['find_ball']()
+    # v32: Stall avoidance
+    if with_rule_avoidance and ball_stalled:
+        ball_map = agent.get_ball_pos_in_map()
+        if ball_map is not None and agent.get_ball_distance() < 1.0:
+            _move_to_position(agent, float(ball_map[0]) - 1.5,
+                              float(ball_map[1]) + 0.8)
+            return
 
-    
-def _playing_logic(agent):
-    """
-    Simplified playing logic without GameController.
-    """
-    # 1. Look for ball
     if not agent.get_if_ball():
         agent.state_machine_runners['find_ball']()
         return
 
-    # 2. Chase Ball
-    if agent.get_ball_distance() > agent.default_chase_distance:
-        agent.state_machine_runners['chase_ball']()
+    ball_dist = agent.get_ball_distance()
+
+    if ball_dist < 0.8:
+        _dribble_towards_goal(agent)
         return
-    
-    # 3. Ball Interaction (Close enough) -> NEW Dribble
-    agent.state_machine_runners['adv_dribble']()
 
-def _test_adv_dribble(agent) -> None:
-    if not agent.get_if_ball():
-        agent.state_machine_runners['find_ball']()
-    else:
-        agent.state_machine_runners['adv_dribble']()
-
-def _test_dribble(agent) -> None:
-    if not agent.get_if_ball():
-        agent.state_machine_runners['find_ball']()
-    else:
-        agent.state_machine_runners['dribble'](aim_yaw=0)
-
-def _test_find_ball(agent) -> None:
-    agent.state_machine_runners['find_ball']()
-
-def _test_chase_ball(agent) -> None:
-    if not agent.get_if_ball():
-        agent.state_machine_runners['find_ball']()
+    ball_map = agent.get_ball_pos_in_map()
+    if ball_map is not None:
+        _move_to_position(agent, float(ball_map[0]), float(ball_map[1]))
     else:
         agent.state_machine_runners['chase_ball']()
+
+
+def _role_defender(agent, with_rule_avoidance=False,
+                   near_exceeded=False, ball_stalled=False):
+    """Defender: chase in our half, hold position otherwise."""
+    # v32: Ball holding avoidance
+    if with_rule_avoidance and near_exceeded:
+        ball_map = agent.get_ball_pos_in_map()
+        if ball_map is not None and agent.get_ball_distance() < 0.5:
+            _move_to_position(agent, float(ball_map[0]) - 1.5,
+                              float(ball_map[1]) + 1.0)
+            return
+
+    # v32: Stall avoidance
+    if with_rule_avoidance and ball_stalled:
+        ball_map = agent.get_ball_pos_in_map()
+        if ball_map is not None and agent.get_ball_distance() < 1.0:
+            _move_to_position(agent, -3.5, float(ball_map[1]) * 0.5)
+            return
+
+    if not agent.get_if_ball():
+        _move_to_position(agent, -2.0, 0.0)
+        return
+
+    ball_pos = agent.get_ball_pos_in_map()
+    my_pos = agent.get_self_pos()
+    ball_dist = agent.get_ball_distance()
+
+    if ball_pos is not None and my_pos is not None:
+        ball_x = float(ball_pos[0])
+
+        if ball_dist < 0.8:
+            _dribble_towards_goal(agent)
+            return
+
+        if ball_x < 1.0 or ball_dist < 2.0:
+            _move_to_position(agent, float(ball_pos[0]), float(ball_pos[1]))
+            return
+
+    _move_to_position(agent, -2.5, 0.0)
+
+
+def _role_goalkeeper(agent, with_rule_avoidance=False,
+                     near_exceeded=False, ball_stalled=False):
+    """Goalkeeper: track ball Y on goal line, intercept when close.
+    v32: GK has longer ball-hold limit (10s vs 5s)."""
+    gk_x = -HALF_LENGTH + 0.3
+
+    # v32: GK ball holding — uses longer limit
+    if with_rule_avoidance and agent.rule_state.near_ball_time > BALL_HOLD_LIMIT_GK:
+        if not agent.get_if_ball():
+            _move_to_position(agent, gk_x, 0.0)
+            return
+        ball_map = agent.get_ball_pos_in_map()
+        if ball_map is not None and agent.get_ball_distance() < 0.5:
+            target_y = max(-GOAL_HALF + 0.1, min(GOAL_HALF - 0.1, float(ball_map[1]) * 0.4))
+            _move_to_position(agent, gk_x, target_y)
+            return
+
+    if not agent.get_if_ball():
+        _move_to_position(agent, gk_x, 0.0)
+        return
+
+    ball_pos = agent.get_ball_pos_in_map()
+    ball_dist = agent.get_ball_distance()
+
+    if ball_pos is not None:
+        ball_x = float(ball_pos[0])
+        ball_y = float(ball_pos[1])
+
+        if ball_dist < 1.5 and ball_x < -2.0:
+            agent.state_machine_runners['goalkeeper']()
+            return
+
+        target_y = max(-1.3, min(1.3, ball_y))
+        _move_to_position(agent, gk_x, target_y)
+        return
+
+    _move_to_position(agent, gk_x, 0.0)
+
+
+# ============================================================
+# Motion primitives
+# ============================================================
+def _move_to_position(agent, target_x, target_y):
+    """Fast position movement using direct cmd_vel."""
+    my_pos = agent.get_self_pos()
+    my_yaw_deg = agent.get_self_yaw()
+
+    if my_pos is None:
+        agent.cmd_vel(0, 0, 0)
+        return
+
+    # v32: Boundary clamp
+    target_x = max(-HALF_LENGTH - 0.3, min(HALF_LENGTH + 0.3, target_x))
+    target_y = max(-HALF_WIDTH - 0.3, min(HALF_WIDTH + 0.3, target_y))
+
+    dx = target_x - float(my_pos[0])
+    dy = target_y - float(my_pos[1])
+    dist = math.hypot(dx, dy)
+
+    if dist < 0.2:
+        agent.cmd_vel(0, 0, 0)
+        return
+
+    target_angle = math.atan2(dy, dx)
+    yaw_rad = math.radians(my_yaw_deg)
+    angle_diff = target_angle - yaw_rad
+    while angle_diff > math.pi:
+        angle_diff -= 2 * math.pi
+    while angle_diff < -math.pi:
+        angle_diff += 2 * math.pi
+
+    if abs(angle_diff) > 0.5:
+        agent.cmd_vel(0.0, 0.0, np.sign(angle_diff) * 0.8)
+        return
+
+    speed = min(1.0, dist * 1.5)
+    local_vx = speed * math.cos(angle_diff)
+    local_vy = speed * math.sin(angle_diff)
+    vw = -0.5 * angle_diff
+
+    agent.cmd_vel(local_vx, local_vy, max(-0.5, min(0.5, vw)))
+
+
+def _dribble_towards_goal(agent):
+    """Dribble ball towards opponent goal with aggressive forward velocity."""
+    if not agent.get_if_ball():
+        agent.state_machine_runners['find_ball']()
+        return
+
+    ball_pos = agent.get_ball_pos()  # Relative [forward, left]
+    my_pos = agent.get_self_pos()
+    my_yaw = agent.get_self_yaw()
+
+    if ball_pos is None:
+        agent.state_machine_runners['find_ball']()
+        return
+
+    b_x = float(ball_pos[0])
+    b_y = float(ball_pos[1])
+    ball_dist = math.hypot(b_x, b_y)
+
+    if ball_dist > 0.6:
+        agent.state_machine_runners['chase_ball']()
+        return
+
+    goal_angle_local = 0
+    if my_pos is not None:
+        goal_dx = HALF_LENGTH - float(my_pos[0])
+        goal_dy = 0.0 - float(my_pos[1])
+        goal_angle_global = math.atan2(goal_dy, goal_dx)
+        yaw_rad = math.radians(my_yaw)
+        goal_angle_local = goal_angle_global - yaw_rad
+        while goal_angle_local > math.pi:
+            goal_angle_local -= 2 * math.pi
+        while goal_angle_local < -math.pi:
+            goal_angle_local += 2 * math.pi
+
+    if b_x > 0.02:
+        vx = min(1.5, 0.8 + 0.5 * b_x)
+    else:
+        vx = 0.3
+
+    vy = -2.0 * b_y
+    vw = -1.0 * goal_angle_local
+
+    vx = max(-1.5, min(1.5, vx))
+    vy = max(-1.5, min(1.5, vy))
+    vw = max(-1.0, min(1.0, vw))
+
+    agent.cmd_vel(vx, vy, vw)

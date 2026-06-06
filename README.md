@@ -10,6 +10,8 @@
   - `config.yaml` — 参数配置
   - `logic/` — 状态机 (find_ball, chase_ball, dribble, goalkeeper)
   - `interfaces/` — ZMQ通信、视觉、动作接口
+- `gait/` — 步态模型
+  - `k1_amp_20000.onnx` — K1 AMP 步态策略 ONNX 模型
 
 ## ZMQ协议
 ```json
@@ -17,3 +19,9 @@
 ```
 - id: 0-6 红队, 7-13 蓝队
 - cmd: 机器人坐标系速度 [-1.0, 1.0]
+
+## 版本历史
+- v32-official: 官方提交规范合规版 (初始)
+- v32-official-fix1: 官方提交规范合规版修复版
+  - 修复 user_entry.py 开球位置索引 bug (KICKOFF_POSITIONS_RED[we_kick][role] → [role])
+  - requirements.txt 补充 matplotlib 依赖
