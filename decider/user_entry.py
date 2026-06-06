@@ -198,12 +198,18 @@ def loop(agent) -> None:
                 role_names = {0: "FWD", 1: "DEF", 2: "GK"}
                 ball_seen = agent.get_if_ball()
                 ball_dist = agent.get_ball_distance() if ball_seen else -1
+                ball_map = agent.get_ball_pos_in_map() if ball_seen else None
+                ball_rel = agent.get_ball_pos() if ball_seen else [None, None]
                 logger = agent.get_logger()
                 pos_str = f"({my_pos[0]:.2f},{my_pos[1]:.2f})" if my_pos is not None else "None"
+                bm_str = f"({ball_map[0]:.2f},{ball_map[1]:.2f})" if ball_map is not None else "None"
+                br_str = f"({ball_rel[0]:.2f},{ball_rel[1]:.2f})" if ball_rel[0] is not None else "None"
                 logger.info(
                     f"[DBG] {color}#{local_id}({role_names.get(local_id,'?')}) "
                     f"pos={pos_str} yaw={my_yaw:.1f}° "
-                    f"ball_dist={ball_dist:.2f} nb_t={agent.rule_state.near_ball_time:.1f}s"
+                    f"ball_dist={ball_dist:.2f} "
+                    f"ball_map={bm_str} ball_rel={br_str} "
+                    f"nb_t={agent.rule_state.near_ball_time:.1f}s"
                 )
             except Exception as de:
                 agent.get_logger().warning(f"[DBG-ERR] {de}")
@@ -374,6 +380,26 @@ def _role_forward(agent, with_rule_avoidance=False,
             return
 
     if not agent.get_if_ball():
+        # 看不到球时：先尝试从其他机器人获取球位置
+        ball_from_team = None
+        if hasattr(agent, 'get_ball_angle_from_other_robots'):
+            try:
+                ball_from_team = agent.get_ball_angle_from_other_robots()
+            except Exception:
+                ball_from_team = None
+        if ball_from_team is not None:
+            # 有队友看到球，旋转到球方向
+            agent.state_machine_runners['find_ball']()
+            return
+        # 无队友信息：朝球场中央(0,0)走去，同时旋转找球
+        my_pos = agent.get_self_pos()
+        if my_pos is not None:
+            dist_to_center = math.hypot(float(my_pos[0]), float(my_pos[1]))
+            if dist_to_center > 1.0:
+                # 朝中央移动，不走find_ball原地转
+                _move_to_position(agent, 0.0, 0.0)
+                return
+        # 离中央很近了还没看到球，旋转找球
         agent.state_machine_runners['find_ball']()
         return
 
@@ -472,7 +498,7 @@ def _role_goalkeeper(agent, with_rule_avoidance=False,
 # ============================================================
 # Motion primitives
 # ============================================================
-def _move_to_position(agent, target_x, target_y):
+def _move_to_position(agent, target_x, target_y, debug_label=""):
     """Fast position movement using direct cmd_vel."""
     my_pos = agent.get_self_pos()
     my_yaw_deg = agent.get_self_yaw()
@@ -502,14 +528,26 @@ def _move_to_position(agent, target_x, target_y):
         angle_diff += 2 * math.pi
 
     if abs(angle_diff) > 0.5:
-        agent.cmd_vel(0.0, 0.0, np.sign(angle_diff) * 0.8)
+        vw = np.sign(angle_diff) * 0.8
+        if getattr(agent, '_debug_tick', 0) % 50 == 0:
+            agent.get_logger().info(
+                f"[MTP{debug_label}] ROTATE pos=({my_pos[0]:.2f},{my_pos[1]:.2f}) "
+                f"yaw={my_yaw_deg:.1f}° tgt=({target_x:.2f},{target_y:.2f}) "
+                f"tgt_ang={math.degrees(target_angle):.1f}° adiff={math.degrees(angle_diff):.1f}° vw={vw:.1f}"
+            )
+        agent.cmd_vel(0.0, 0.0, vw)
         return
 
     speed = min(1.0, dist * 1.5)
     local_vx = speed * math.cos(angle_diff)
     local_vy = speed * math.sin(angle_diff)
     vw = -0.5 * angle_diff
-
+    if getattr(agent, '_debug_tick', 0) % 50 == 0:
+        agent.get_logger().info(
+            f"[MTP{debug_label}] WALK pos=({my_pos[0]:.2f},{my_pos[1]:.2f}) "
+            f"yaw={my_yaw_deg:.1f}° tgt=({target_x:.2f},{target_y:.2f}) "
+            f"vx={local_vx:.2f} vy={local_vy:.2f} vw={vw:.2f}"
+        )
     agent.cmd_vel(local_vx, local_vy, max(-0.5, min(0.5, vw)))
 
 
@@ -532,7 +570,11 @@ def _dribble_towards_goal(agent):
     ball_dist = math.hypot(b_x, b_y)
 
     if ball_dist > 0.6:
-        agent.state_machine_runners['chase_ball']()
+        # Use _move_to_position toward ball instead of chase_ball FSM
+        # (chase_ball FSM gets stuck in rotate due to slow gait rotation)
+        ball_map = agent.get_ball_pos_in_map()
+        if ball_map is not None:
+            _move_to_position(agent, float(ball_map[0]), float(ball_map[1]), debug_label="/dribble")
         return
 
     goal_angle_local = 0

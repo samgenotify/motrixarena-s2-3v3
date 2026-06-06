@@ -28,10 +28,10 @@
 - v32-official-fix2: 官方提交规范合规版修复版2
   - 修复 strategy/team_manager.py:20 ImportError (StateMachine → AttackStateMachine)
   - README_步态.md 补充 ONNX 模型 SHA256 校验值
-- v32-official-fix3: 官方提交规范合规版修复版3 (验证确认版)
-  - 在全新干净环境中完成完整部署+验证流程
-  - 所有 .py 文件 py_compile 通过, fix2 ImportError 修复确认到位
-  - ONNX 模型推理验证通过 (输入[1,375]float32 → 输出[1,22]float32)
-  - 3v3 端到端冒烟测试通过 (6端存活, 636+ CMD, 0 错误)
-  - 策略行为验证: Forward 63% CMD 含前进追球指令, Defender 64%
-  - 无代码变更, 仅补充验证记录
+- v32-official-fix3: 文档补充版 (无代码变更)
+  - README.md 更新交付规范链接和验证说明
+- v32-official-fix4: 策略行为优化版
+  - Forward 看不到球时朝球场中央移动（原为原地旋转）
+  - dribble 状态中 ball_dist>0.6 改用 _move_to_position 直奔球（原 chase_ball FSM 旋转卡死）
+  - 增加 _move_to_position 调试日志和 ball_map/ball_rel 状态输出
+  - 验证结果: 3v3 GPU 环境下 FWD 成功追球并持续推球 4.1m
