@@ -44,7 +44,9 @@ print('Outputs:', [(o.name, o.shape, o.type) for o in sess.get_outputs()])
 
 ```
 gait/
-└── k1_amp_20000.onnx    # 1.5MB, SHA256 待补
+└── k1_amp_20000.onnx    # 1.5MB
+                          # SHA256: 3b4c210cbc30d7f23c8f3fd56c09d24f575833cb7f3f78364b94cf31ec513a48
+                          # 大小: 1470774 bytes (1.43 MB)
 ```
 
 ## 备注

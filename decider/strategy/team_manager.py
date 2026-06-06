@@ -17,7 +17,7 @@ if DECIDER_PATH not in sys.path:
 from logic.strategy_statemachines.defend_ball_state_machine import DefendBallStateMachine
 from logic.strategy_statemachines.dribble_ball_state_machine import DribbleBallStateMachine
 from logic.strategy_statemachines.shoot_ball_state_machine import ShootBallStateMachine
-from logic.strategy_statemachines.attack_state_machine import StateMachine
+from logic.strategy_statemachines.attack_state_machine import AttackStateMachine as StateMachine
 
 # Configure logging
 logging.basicConfig(

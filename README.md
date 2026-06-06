@@ -25,3 +25,6 @@
 - v32-official-fix1: 官方提交规范合规版修复版
   - 修复 user_entry.py 开球位置索引 bug (KICKOFF_POSITIONS_RED[we_kick][role] → [role])
   - requirements.txt 补充 matplotlib 依赖
+- v32-official-fix2: 官方提交规范合规版修复版2
+  - 修复 strategy/team_manager.py:20 ImportError (StateMachine → AttackStateMachine)
+  - README_步态.md 补充 ONNX 模型 SHA256 校验值
